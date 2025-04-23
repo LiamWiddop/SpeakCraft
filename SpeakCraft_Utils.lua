@@ -47,34 +47,63 @@ end
 function utils.GetNPCDisplayID()
     -- Check if target exists
     if not UnitExists("target") then
+        utils.Debug("No target exists for getting display ID")
         return nil
     end
     
     -- Try to get the display ID
     local modelDisplay = nil
+    local npcID = nil
     
-    -- Different methods to try getting display ID
-    if UnitIsVisible("target") then
-        -- Method 1: For NPCs in view
-        if addon.TTSLogFrame and addon.TTSLogFrame.modelDisplay then
-            addon.TTSLogFrame.modelDisplay:SetUnit("target")
-            modelDisplay = addon.TTSLogFrame.modelDisplay:GetDisplayInfo()
+    -- Try to get from GUID first (most reliable for storage)
+    local guid = UnitGUID("target")
+    if guid then
+        local type, _, _, _, _, id = strsplit("-", guid)
+        if type == "Creature" and id then
+            npcID = tonumber(id)
+            utils.Debug("Got NPC ID: " .. tostring(npcID))
         end
     end
     
-    -- Method 2: Try to get display ID from GUID if method 1 failed
-    if not modelDisplay then
-        local guid = UnitGUID("target")
-        if guid then
-            local type, _, _, _, _, npcID = strsplit("-", guid)
-            if type == "Creature" and npcID then
-                -- We don't have direct API access to convert npcID to displayID
-                -- In a full implementation, you would need a database or lookup table
-                -- For now, we'll just store the npcID as a fallback
-                modelDisplay = tonumber(npcID)
-                utils.Debug("Using npcID as fallback for displayID: " .. npcID)
-            end
-        end
+    -- Store the npcID for now, we'll try to get a real display ID during actual display
+    if npcID then
+        modelDisplay = npcID
+    end
+    
+    -- If we have a log frame with a model display, try to capture the real display ID
+    if addon.TTSLogFrame and addon.TTSLogFrame.modelDisplay then
+        utils.Debug("Attempting to get displayID from model")
+        
+        -- Create a temporary hidden model to avoid messing with the visible one
+        local tempFrame = CreateFrame("Frame")
+        tempFrame:Hide()
+        local tempModel = CreateFrame("PlayerModel", nil, tempFrame)
+        
+        -- Try to set the model and get its display info
+        tempModel:SetUnit("target")
+        
+        -- Try to get the display info after a tiny delay to allow the model to load
+        C_Timer.After(0.05, function()
+            pcall(function()
+                local displayID = tempModel:GetDisplayInfo()
+                if displayID then
+                    utils.Debug("Successfully captured displayID: " .. displayID)
+                    -- If we've found a real display ID, update our stored model info
+                    for i, entry in ipairs(addon.logEntries) do
+                        if entry.model and entry.model.guid == guid then
+                            entry.model.displayID = displayID
+                            utils.Debug("Updated stored displayID for entry")
+                        end
+                    end
+                end
+            end)
+            
+            -- Clean up
+            tempModel:SetParent(nil)
+            tempModel = nil
+            tempFrame:SetParent(nil)
+            tempFrame = nil
+        end)
     end
     
     return modelDisplay
