@@ -1,0 +1,13 @@
+## Interface: 11507
+## Title: SpeakCraft
+## Notes: Gender-Based TTS for NPC dialog in WoW
+## Author: Your Name
+## Version: 1.0.0
+## SavedVariables: SpeakCraftDB
+
+# Core files
+SpeakCraft.lua
+SpeakCraft_Utils.lua
+SpeakCraft_Core.lua
+SpeakCraft_UI.lua
+SpeakCraft_Events.lua
